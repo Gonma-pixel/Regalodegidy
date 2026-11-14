@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Component, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import type {
   DedicationProfile,
@@ -17,6 +17,46 @@ import { TimeTogetherPage } from './components/TimeTogetherPage';
 import { calculateDuration } from './components/TimeTogetherCounter';
 import { SeaRingExperience } from './components/SeaRingExperience';
 import { DrawingsDashboardPage } from './components/DrawingsDashboardPage';
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+
+class AppErrorBoundary extends Component<
+  { children: ReactNode },
+  ErrorBoundaryState
+> {
+  state: ErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen w-full bg-gradient-to-br from-[#E7F8E8] via-[#F7FCE6] to-[#FEF9D7] flex flex-col items-center justify-center px-6 py-12 text-center text-[#141214]">
+          <div className="max-w-md rounded-2xl bg-white/95 border border-[#D5E6D6] p-8 shadow-sm space-y-4">
+            <h1 className="font-serif text-2xl font-medium">
+              Ocurrió un problema al cargar la página
+            </h1>
+            <p className="text-sm text-[#574F53]">
+              Presiona el botón para volver a intentarlo.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="px-6 py-2.5 text-sm font-medium text-white bg-[#15803D] hover:bg-[#166534] rounded-xl transition-colors cursor-pointer"
+            >
+              Recargar página
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const KEYS = {
   profile: 'dedication_profile_v1',
@@ -68,7 +108,7 @@ export default function App() {
 
       if (!active) return;
       if (savedProfile) {
-        const nextProfile = { ...savedProfile };
+        const nextProfile = { ...DEFAULT_PROFILE, ...savedProfile };
         if (nextProfile.coupleNames === 'Sofía & Mateo') {
           nextProfile.coupleNames = DEFAULT_PROFILE.coupleNames;
           nextProfile.partnerOne = DEFAULT_PROFILE.partnerOne;
@@ -80,7 +120,10 @@ export default function App() {
         ) {
           nextProfile.headline = DEFAULT_PROFILE.headline;
         }
-        if (nextProfile.letter.startsWith('Desde aquella tarde de junio')) {
+        if (
+          typeof nextProfile.letter === 'string' &&
+          nextProfile.letter.startsWith('Desde aquella tarde de junio')
+        ) {
           nextProfile.letter = DEFAULT_PROFILE.letter;
         }
         if (nextProfile.startDateIso === '2022-06-14T19:30') {
@@ -88,7 +131,7 @@ export default function App() {
         }
         setProfile(nextProfile);
       }
-      if (savedMemories) setMemories(savedMemories);
+      if (Array.isArray(savedMemories)) setMemories(savedMemories);
       if (savedSignature) setPartnerSignature(savedSignature);
       setHydrated(true);
     })();
@@ -132,31 +175,34 @@ export default function App() {
 
   if (dashboardRoute.active) {
     return (
-      <MotionConfig reducedMotion="user">
-        <DrawingsDashboardPage
-          initialDrawingId={dashboardRoute.drawingId}
-          onGoToStory={() => {
-            window.history.pushState(null, '', window.location.pathname || './');
-            setDashboardRoute({ active: false, drawingId: null });
-          }}
-        />
-      </MotionConfig>
+      <AppErrorBoundary>
+        <MotionConfig reducedMotion="user">
+          <DrawingsDashboardPage
+            initialDrawingId={dashboardRoute.drawingId}
+            onGoToStory={() => {
+              window.history.pushState(null, '', window.location.pathname || './');
+              setDashboardRoute({ active: false, drawingId: null });
+            }}
+          />
+        </MotionConfig>
+      </AppErrorBoundary>
     );
   }
 
   return (
-    <MotionConfig reducedMotion="user">
-      <AnimatePresence mode="wait">
-        {entryStage === 'chick' ? (
-          <motion.div
-            key="opening-gate"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-          >
-            <OpeningChickGate onOpen={() => setEntryStage('envelope')} />
-          </motion.div>
+    <AppErrorBoundary>
+      <MotionConfig reducedMotion="user">
+        <AnimatePresence mode="wait" initial={false}>
+          {entryStage === 'chick' ? (
+            <motion.div
+              key="opening-gate"
+              initial={{ opacity: 1 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <OpeningChickGate onOpen={() => setEntryStage('envelope')} />
+            </motion.div>
         ) : entryStage === 'envelope' ? (
           <motion.div
             key="fingerprint-envelope"
@@ -217,5 +263,6 @@ export default function App() {
         )}
       </AnimatePresence>
     </MotionConfig>
+    </AppErrorBoundary>
   );
 }
