@@ -53,6 +53,9 @@ export function FingerprintEnvelopeStep({
 
   const rafRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number | null>(null);
+  const progressRef = useRef(0);
+  const onUnlockedRef = useRef(onUnlocked);
+  onUnlockedRef.current = onUnlocked;
 
   useEffect(() => {
     if (isUnlocked) return;
@@ -61,26 +64,31 @@ export function FingerprintEnvelopeStep({
       if (lastTimeRef.current === null) {
         lastTimeRef.current = timestamp;
       }
-      const delta = timestamp - lastTimeRef.current;
+      const delta = Math.min(64, Math.max(0, timestamp - lastTimeRef.current));
       lastTimeRef.current = timestamp;
 
-      setProgress((prev) => {
-        const next = isHolding
-          ? Math.min(1, prev + delta / HOLD_DURATION_MS)
-          : Math.max(0, prev - delta / 550);
+      const prev = progressRef.current;
+      const next = isHolding
+        ? Math.min(1, prev + delta / HOLD_DURATION_MS)
+        : Math.max(0, prev - delta / 550);
 
-        if (next >= 1) {
-          setIsUnlocked(true);
-          setIsHolding(false);
-          return 1;
-        }
-        return next;
-      });
+      progressRef.current = next;
+      setProgress(next);
 
-      rafRef.current = requestAnimationFrame(step);
+      if (next >= 1) {
+        setIsUnlocked(true);
+        setIsHolding(false);
+        return;
+      }
+
+      if (isHolding || next > 0) {
+        rafRef.current = requestAnimationFrame(step);
+      } else {
+        rafRef.current = null;
+      }
     };
 
-    if (isHolding || progress > 0) {
+    if (isHolding || progressRef.current > 0) {
       lastTimeRef.current = null;
       rafRef.current = requestAnimationFrame(step);
     }
@@ -91,7 +99,7 @@ export function FingerprintEnvelopeStep({
         rafRef.current = null;
       }
     };
-  }, [isHolding, isUnlocked, progress > 0]);
+  }, [isHolding, isUnlocked]);
 
   // Sequence: 1) Envelope flap opens & card rises -> 2) Card expands to full screen -> 3) Hand off to full-screen letter page
   useEffect(() => {
@@ -106,7 +114,7 @@ export function FingerprintEnvelopeStep({
 
     const completeTimer = window.setTimeout(
       () => {
-        onUnlocked();
+        onUnlockedRef.current();
       },
       prefersReducedMotion ? 150 : 1280
     );
@@ -115,7 +123,7 @@ export function FingerprintEnvelopeStep({
       window.clearTimeout(expandTimer);
       window.clearTimeout(completeTimer);
     };
-  }, [isUnlocked, onUnlocked, prefersReducedMotion]);
+  }, [isUnlocked, prefersReducedMotion]);
 
   const startHold = () => {
     if (isUnlocked) return;

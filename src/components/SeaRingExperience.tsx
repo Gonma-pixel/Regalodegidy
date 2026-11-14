@@ -239,6 +239,15 @@ export function SeaRingExperience({
     setPageEntered(true);
   }, []);
 
+  const revealTimersRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    return () => {
+      revealTimersRef.current.forEach((id) => window.clearTimeout(id));
+      revealTimersRef.current = [];
+    };
+  }, []);
+
   const triggerReveal = useCallback(() => {
     const s = simRef.current;
     if (s.revealStarted) return;
@@ -275,10 +284,7 @@ export function SeaRingExperience({
       setPageEntered(true);
     }, 1050);
 
-    return () => {
-      window.clearTimeout(landTimer);
-      window.clearTimeout(enterTimer);
-    };
+    revealTimersRef.current.push(landTimer, enterTimer);
   }, []);
 
   // Intro sequence & poster preloading
@@ -588,7 +594,7 @@ export function SeaRingExperience({
           }
 
           const vid = videoRefs.current[slot];
-          if (vid) {
+          if (vid && vid.hasAttribute('src')) {
             vid.pause();
             vid.removeAttribute('src');
             vid.classList.remove('is-playing');
